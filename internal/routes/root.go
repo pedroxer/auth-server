@@ -15,7 +15,7 @@ type Router struct {
 	port   string
 }
 
-func NewRouter(logger *logrus.Logger, cfg *config.Api) *Router {
+func NewRouter(logger *logrus.Logger, cfg *config.Api, auth Auth) *Router {
 	rtr := fasthttprouter.New()
 	r := &Router{
 		rtr: rtr,
@@ -29,5 +29,6 @@ func NewRouter(logger *logrus.Logger, cfg *config.Api) *Router {
 		logger: logger,
 		port:   cfg.Port,
 	}
+	registerUserRoutes(r, auth)
 	return r
 }
