@@ -1,11 +1,8 @@
 package config
 
 type Config struct {
-	Api        Api      `json:"api"`
-	TimeLayout string   `json:"time_layout"`
-	Postgres   Postgres `json:"postgres"`
-	Secret     string   `env:"SECRET,required"`
-	TokenTTL   int      `json:"token_ttl"`
+	Api      Api      `json:"api"`
+	Postgres Postgres `json:"postgres"`
 }
 
 type Api struct {

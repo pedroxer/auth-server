@@ -32,3 +32,10 @@ func NewRouter(logger *logrus.Logger, cfg *config.Api, auth Auth) *Router {
 	registerUserRoutes(r, auth)
 	return r
 }
+
+func (r *Router) Start() error {
+	return r.srv.ListenAndServe(r.port)
+}
+func (r *Router) Shutdown() error {
+	return r.srv.Shutdown()
+}

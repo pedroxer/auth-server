@@ -2,14 +2,14 @@ package routes
 
 import (
 	"encoding/json"
-	"github.com/pedroxer/auth-service/internal/service/auth"
+	"github.com/pedroxer/auth-service/internal/service"
 	"github.com/valyala/fasthttp"
 )
 
 type Auth interface {
 	Login(username, password string, appId int) (string, string, error)
-	Validate(accessToken string) (bool, error)
-	Refresh(refreshToken string) (string, error)
+	Validate(accessToken string, appID int) (bool, error)
+	Refresh(refreshToken string, appID int) (string, error)
 }
 
 type userImpl struct {
@@ -24,7 +24,7 @@ func registerUserRoutes(r *Router, auth Auth) *userImpl {
 	}
 
 	impl.r.rtr.POST("/api/v1/login", impl.login)
-	impl.r.rtr.GET("/api/v1/login", impl.validateToken)
+	impl.r.rtr.GET("/api/v1/validate", impl.validateToken)
 	impl.r.rtr.POST("/api/v1/refresh", impl.refreshToken)
 	impl.r.rtr.DELETE("/api/v1/invalidate_token", impl.invalidateToken)
 	return impl
@@ -32,7 +32,7 @@ func registerUserRoutes(r *Router, auth Auth) *userImpl {
 
 func (impl *userImpl) login(ctx *fasthttp.RequestCtx) {
 	type loginRequest struct {
-		Username string `json:"username"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
 		AppId    int    `json:"app_id"`
 	}
@@ -46,12 +46,12 @@ func (impl *userImpl) login(ctx *fasthttp.RequestCtx) {
 		ctx.Error(err.Error(), fasthttp.StatusBadRequest)
 		return
 	}
-	access, refresh, err := impl.auth.Login(req.Username, req.Password, req.AppId)
+	access, refresh, err := impl.auth.Login(req.Email, req.Password, req.AppId)
 	if err != nil {
 		switch err {
-		case auth.ErrUserNotFound:
+		case service.ErrUserNotFound:
 			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
-		case auth.ErrRestricted:
+		case service.ErrRestricted:
 			ctx.Error(err.Error(), fasthttp.StatusForbidden)
 		default:
 			ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
@@ -76,19 +76,24 @@ func (impl *userImpl) login(ctx *fasthttp.RequestCtx) {
 func (impl *userImpl) validateToken(ctx *fasthttp.RequestCtx) {
 	type validateRequest struct {
 		AccessToken string `json:"access_token"`
+		AppID       int    `json:"app_id"`
 	}
 	var req validateRequest
 	if err := json.Unmarshal(ctx.Request.Body(), &req); err != nil {
 		ctx.Error(err.Error(), fasthttp.StatusBadRequest)
 		return
 	}
-	success, err := impl.auth.Validate(req.AccessToken)
+	success, err := impl.auth.Validate(req.AccessToken, req.AppID)
 	if err != nil {
 		switch err {
-		case auth.ErrTokenExpired:
-			ctx.Error(err.Error(), fasthttp.StatusUnauthorized)
-		case auth.ErrInvalidToken:
+		case service.ErrUserNotFound:
 			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+		case service.ErrRestricted:
+			ctx.Error(err.Error(), fasthttp.StatusForbidden)
+		case service.ErrInvalidToken:
+			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+		case service.ErrTokenExpired:
+			ctx.Error(err.Error(), fasthttp.StatusUnauthorized)
 		default:
 			ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
 		}
@@ -107,6 +112,7 @@ func (impl *userImpl) validateToken(ctx *fasthttp.RequestCtx) {
 func (impl *userImpl) refreshToken(ctx *fasthttp.RequestCtx) {
 	type refreshTokenRequest struct {
 		RefreshToken string `json:"refresh_token"`
+		AppID        int    `json:"app_id"`
 	}
 
 	req := refreshTokenRequest{}
@@ -115,14 +121,25 @@ func (impl *userImpl) refreshToken(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	access, err := impl.auth.Refresh(req.RefreshToken)
+	access, err := impl.auth.Refresh(req.RefreshToken, req.AppID)
 	if err != nil {
 		ctx.Error(err.Error(), fasthttp.StatusBadRequest)
 		return
 	}
 	body, err := json.Marshal(access)
 	if err != nil {
-		ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+		switch err {
+		case service.ErrUserNotFound:
+			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+		case service.ErrRestricted:
+			ctx.Error(err.Error(), fasthttp.StatusForbidden)
+		case service.ErrInvalidToken:
+			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+		case service.ErrTokenExpired:
+			ctx.Error(err.Error(), fasthttp.StatusUnauthorized)
+		default:
+			ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+		}
 		return
 	}
 	ctx.SetStatusCode(fasthttp.StatusOK)

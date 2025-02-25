@@ -1,0 +1,15 @@
+{
+  "api": {
+    "port": ":8080",
+    "read_timeout": 10,
+    "write_timeout": 10,
+    "idle_timeout": 10
+  },
+  "postgres": {
+    "host": "localhost",
+    "port": 5432,
+    "db": "booking",
+    "sslmode": "disable",
+    "max_conns": 10
+  }
+}
