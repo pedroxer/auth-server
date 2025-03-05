@@ -2,40 +2,39 @@ package routes
 
 import (
 	"encoding/json"
+
+	commonerrors "github.com/pedroxer/auth-service/internal/routes/common_errors"
 	"github.com/pedroxer/auth-service/internal/service"
+	"github.com/pedroxer/auth-service/internal/service/auth"
 	"github.com/valyala/fasthttp"
 )
 
-type Auth interface {
-	Login(username, password string, appId int) (string, string, error)
-	Validate(accessToken string, appID int) (bool, error)
-	Refresh(refreshToken string, appID int) (string, error)
-}
 
 type userImpl struct {
 	r    *Router
-	auth Auth
+	auth auth.Auth
 }
 
-func registerUserRoutes(r *Router, auth Auth) *userImpl {
-	impl := &userImpl{
+func registerUserRoutes(r *Router, auth auth.Auth) {
+	impl := userImpl{
 		r:    r,
 		auth: auth,
 	}
 
-	impl.r.rtr.POST("/api/v1/login", impl.login)
-	impl.r.rtr.GET("/api/v1/validate", impl.validateToken)
-	impl.r.rtr.POST("/api/v1/refresh", impl.refreshToken)
-	impl.r.rtr.DELETE("/api/v1/invalidate_token", impl.invalidateToken)
-	return impl
+	r.rtr.POST("/api/v1/login", impl.login)
+	r.rtr.GET("/api/v1/validate", impl.validateToken)
+	r.rtr.POST("/api/v1/refresh", impl.refreshToken)
+	r.rtr.DELETE("/api/v1/invalidate_token", impl.invalidateToken)
 }
 
 func (impl *userImpl) login(ctx *fasthttp.RequestCtx) {
+	ctx.SetContentType("application/json")
 	type loginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 		AppId    int    `json:"app_id"`
 	}
+	
 	type loginResponse struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
@@ -50,11 +49,11 @@ func (impl *userImpl) login(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		switch err {
 		case service.ErrUserNotFound:
-			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusBadRequest)
 		case service.ErrRestricted:
-			ctx.Error(err.Error(), fasthttp.StatusForbidden)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusForbidden)
 		default:
-			ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusInternalServerError)
 		}
 		return
 	}
@@ -74,6 +73,7 @@ func (impl *userImpl) login(ctx *fasthttp.RequestCtx) {
 }
 
 func (impl *userImpl) validateToken(ctx *fasthttp.RequestCtx) {
+	ctx.SetContentType("application/json")
 	type validateRequest struct {
 		AccessToken string `json:"access_token"`
 		AppID       int    `json:"app_id"`
@@ -87,15 +87,15 @@ func (impl *userImpl) validateToken(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		switch err {
 		case service.ErrUserNotFound:
-			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusBadRequest)
 		case service.ErrRestricted:
-			ctx.Error(err.Error(), fasthttp.StatusForbidden)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusForbidden)
 		case service.ErrInvalidToken:
-			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusBadRequest)
 		case service.ErrTokenExpired:
-			ctx.Error(err.Error(), fasthttp.StatusUnauthorized)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusUnauthorized)
 		default:
-			ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusInternalServerError)
 		}
 		return
 	}
@@ -105,11 +105,12 @@ func (impl *userImpl) validateToken(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetContentType("application/json")
+	
 	ctx.SetBody(body)
 }
 
 func (impl *userImpl) refreshToken(ctx *fasthttp.RequestCtx) {
+	ctx.SetContentType("application/json")
 	type refreshTokenRequest struct {
 		RefreshToken string `json:"refresh_token"`
 		AppID        int    `json:"app_id"`
@@ -117,7 +118,8 @@ func (impl *userImpl) refreshToken(ctx *fasthttp.RequestCtx) {
 
 	req := refreshTokenRequest{}
 	if err := json.Unmarshal(ctx.Request.Body(), &req); err != nil {
-		ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+		ctx.SetBodyString(err.Error())
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		return
 	}
 
@@ -130,15 +132,15 @@ func (impl *userImpl) refreshToken(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		switch err {
 		case service.ErrUserNotFound:
-			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusBadRequest)
 		case service.ErrRestricted:
-			ctx.Error(err.Error(), fasthttp.StatusForbidden)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusForbidden)
 		case service.ErrInvalidToken:
-			ctx.Error(err.Error(), fasthttp.StatusBadRequest)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusBadRequest)
 		case service.ErrTokenExpired:
-			ctx.Error(err.Error(), fasthttp.StatusUnauthorized)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusUnauthorized)
 		default:
-			ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+			commonerrors.FormError(ctx, err.Error(), fasthttp.StatusInternalServerError)
 		}
 		return
 	}

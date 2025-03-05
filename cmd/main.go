@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/caarlos0/env/v6"
 	"github.com/pedroxer/auth-service/internal/config"
 	"github.com/pedroxer/auth-service/internal/database"
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	logger := setupLogger()
-	data, err := os.ReadFile("./config/config.json")
+	data, err := os.ReadFile("../config/config.json")
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -40,16 +41,29 @@ func main() {
 	storage := storage2.NewStorage(logger, psDb)
 
 	authService := auth.NewUserAuth(storage, storage, logger)
-
-	router := routes.NewRouter(logger, &cfg.Api, authService)
+	logger.Info("created auth service")
+	if storage == nil {
+		logger.Fatal("storage is nil")
+	}
+	if authService == nil {
+		logger.Fatal("auth service is nil")
+	}
+	if psDb == nil {
+		logger.Fatal("db is nil")
+	}
+	router := routes.New(cfg, logger, authService)
+	fmt.Println(router)
 	errChan := make(chan error, 1)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
+	// go func() {
+	// 	if err := router.Start(); err != nil {
+	// 		errChan <- err
+	// 	}
+	// }()
 		if err := router.Start(); err != nil {
-			errChan <- err
+			logger.Fatal(err)
 		}
-	}()
 
 	var startErr error
 	select {

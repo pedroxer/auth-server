@@ -8,6 +8,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type Auth interface {
+	Login(username, password string, appId int) (string, string, error)
+	Validate(accessToken string, appID int) (bool, error)
+	Refresh(refreshToken string, appID int) (string, error)
+}
+
 type UserProvider interface {
 	GetUser(email string) (models.User, error)
 	GetUserByID(userID int) (models.User, error)
@@ -46,14 +52,16 @@ func (ua *UserAuth) Validate(token string, appId int) (bool, error) {
 	return true, nil
 }
 
-func (ua *UserAuth) Login(username, password string, appId int) (string, string, error) {
-	user, err := ua.UsPrv.GetUser(username)
+func (ua *UserAuth) Login(email, password string, appId int) (string, string, error) {
+	user, err := ua.UsPrv.GetUser(email)
 	if err != nil {
+		ua.logger.Warn("user not found")
 		return "", "", err
 	}
 
 	app, err := ua.AppPrv.GetApp(appId)
 	if err != nil {
+		ua.logger.Warn("app not found")
 		return "", "", err
 	}
 	err = hashing.CheckPassword(password, user.Password)

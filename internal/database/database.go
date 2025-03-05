@@ -20,7 +20,7 @@ func ConnectToPG(cfg *config.Postgres) (*sql.DB, error) {
 
 	db, _ := sql.Open("postgres", DSN)
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("ConnectToDb: %w", err)
+		return nil, fmt.Errorf("ConnectToPG: %w", err)
 	}
 
 	db.SetMaxOpenConns(cfg.MaxConns)

@@ -1,35 +1,44 @@
 package routes
 
 import (
+	"time"
+
 	fasthttprouter "github.com/fasthttp/router"
 	"github.com/pedroxer/auth-service/internal/config"
+	"github.com/pedroxer/auth-service/internal/service/auth"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
-	"time"
 )
 
 type Router struct {
-	rtr    *fasthttprouter.Router
-	srv    *fasthttp.Server
-	logger *logrus.Logger
-	port   string
+	rtr     *fasthttprouter.Router
+	srv     *fasthttp.Server
+	logger  *logrus.Logger
+	port    string
 }
 
-func NewRouter(logger *logrus.Logger, cfg *config.Api, auth Auth) *Router {
+func New(cfg *config.Config, logger *logrus.Logger, auth auth.Auth) *Router {
+
 	rtr := fasthttprouter.New()
+
 	r := &Router{
-		rtr: rtr,
+		rtr:     rtr,
 		srv: &fasthttp.Server{
+			Handler:            rtr.Handler,
 			MaxRequestBodySize: 100_000_000,
-			ReadTimeout:        time.Duration(cfg.ReadTimeout) * time.Second,
-			WriteTimeout:       time.Duration(cfg.WriteTimeout) * time.Second,
-			IdleTimeout:        time.Duration(cfg.IdleTimeout) * time.Second,
+			ReadTimeout:        time.Duration(cfg.Api.ReadTimeout) * time.Second,
+			WriteTimeout:       time.Duration(cfg.Api.WriteTimeout) * time.Second,
+			IdleTimeout:        time.Duration(cfg.Api.IdleTimeout) * time.Second,
 			Logger:             logger,
 		},
 		logger: logger,
-		port:   cfg.Port,
+		port:   cfg.Api.Port,
 	}
-	registerUserRoutes(r, auth)
+	registerUserRoutes(r,auth)
+	
+
+	r.rtr.HandleMethodNotAllowed = true
+	
 	return r
 }
 
